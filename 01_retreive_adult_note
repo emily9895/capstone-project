@@ -1,0 +1,63 @@
+import os
+import sys
+import time
+
+import numpy as np
+import pandas as pd
+
+import datetime
+
+import dask
+import dask.dataframe as dd
+import dask.array as da
+import dask.bag as db
+
+from dask.distributed import Client
+
+def setup_note_text(adult_notes_metadata, notes_text):
+    """Takes in the file path for the adult_notes_metadata and note_text parquet file and returns the dask dataframe.
+
+    Select specific columns in retain
+
+    Args:
+        adult_notes_metadata: Pandas dataframe of adult_notes_metadata.
+        notes_text: Dask dataframe of the note_text parquet file.
+
+    Returns:
+        A pandas dataframe
+    """
+    
+    
+    selected_notes = notes_text.merge(
+        adult_notes_metadata,
+        how = 'inner',
+        left_index = True,
+        right_index = True
+    )
+    
+    return selected_notes
+
+if __name__ == '__main__':
+    year = int(sys.argv[1])
+    print(f"Step 01_{year}")
+    
+    print("Starting Cluster...")
+    client = Client()
+    print(client.dashboard_link)
+        
+#     adult_notes_metadata = dd.read_parquet(f'data/raw_note_metadata/adult_notes_metadata_{year}.parquet', columns=['patientdurablekey', 'encounterkey'])
+#     note_text = dd.read_parquet('/wynton/protected/project/ic/data/parquet/DEID_CDW/note_text/', index = 'deid_note_key').repartition(npartitions = 200)
+
+    print(f"Retrieving Data {year}...")
+    notes = setup_note_text(
+        adult_notes_metadata = pd.read_parquet(f'data/raw_note_metadata/adult_notes_metadata_{year}.parquet', columns=['patientdurablekey', 'encounterkey']), 
+        notes_text = dd.read_parquet('/wynton/protected/project/ic/data/parquet/DEID_CDW/note_text/', index = 'deid_note_key')
+    )
+
+    print(f"Saving Text Data {year}...")
+    notes.to_parquet(f'data/raw_note_text/notes_{year}.parquet', 
+                     write_index = True)
+        
+    client.close()
+
+
